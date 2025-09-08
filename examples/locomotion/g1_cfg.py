@@ -129,8 +129,8 @@ def g1_env_cfgs():
             2.0,  # right_wrist_yaw_joint]
         ],
         # termination
-        "termination_if_roll_greater_than": 30,  # degree
-        "termination_if_pitch_greater_than": 30,
+        "termination_if_roll_greater_than": 60,  # degree
+        "termination_if_pitch_greater_than": 60,
         # base pose
         "base_init_pos": [0.0, 0.0, 0.80],
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
@@ -141,6 +141,8 @@ def g1_env_cfgs():
         "clip_actions": 100.0,
         # HOMIE related
         "lower_dof": [0, 1, 3, 4, 6, 7, 9, 10, 13, 14, 17, 18],
+        "upper_dof": [2, 5, 8, 11, 12, 15, 16, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28],
+        "num_upper_dof": 17,
     }
     obs_cfg = {
         "num_obs": 97,

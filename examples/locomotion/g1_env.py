@@ -130,6 +130,29 @@ class G1Env:
         )
         self.history_idx = 0  # Current position in circular buffer
 
+        # Upper body action buffers
+        self.upper_actions = torch.zeros(
+            (self.num_envs, self.env_cfg["num_upper_dof"]), device=gs.device, dtype=gs.tc_float
+        )
+        self.step_upper_target_delta = torch.zeros_like(self.upper_actions)
+        self.upper_resample_interval_s = self.env_cfg.get("upper_resample_interval_s", 1.0)
+
+        # Obtain joint limits
+        self.joint_lower_limits = []
+        self.joint_upper_limits = []
+        for joint in self.robot.joints:
+            lower = joint.dofs_limit[0][0]
+            upper = joint.dofs_limit[0][1]
+            self.joint_lower_limits.append(lower)
+            self.joint_upper_limits.append(upper)
+        self.joint_lower_limits = torch.tensor(self.joint_lower_limits, device=gs.device, dtype=gs.tc_float)
+        self.joint_upper_limits = torch.tensor(self.joint_upper_limits, device=gs.device, dtype=gs.tc_float)
+        waist_roll_pitch_idx = [5, 8]  # waist_roll_joint, waist_pitch_joint
+        self.joint_lower_limits[waist_roll_pitch_idx] = 0.0
+        self.joint_upper_limits[waist_roll_pitch_idx] = 0.0
+
+        self.step_count = 0
+
     def _resample_commands(self, envs_idx):
         # task selection
         height_task_prob = self.command_cfg.get("height_task_prob", 0.0)
@@ -155,9 +178,27 @@ class G1Env:
             *self.command_cfg["height_range"], (len(height_task_idx),), gs.device
         )
 
+    def compute_upper_actions(self):
+        self.step_count += 1
+        resample_interval_steps = int(self.upper_resample_interval_s / self.dt)
+        if (self.step_count % resample_interval_steps) == 0:
+            uniform_samples = torch.rand(
+                self.num_envs, self.env_cfg["num_upper_dof"], device=gs.device, dtype=gs.tc_float
+            )
+            joint_range = self.joint_upper_limits - self.joint_lower_limits
+            self.interval_upper_target = (
+                self.joint_lower_limits[self.env_cfg["upper_dof"]]
+                + uniform_samples * joint_range[self.env_cfg["upper_dof"]]
+            )
+            self.step_upper_target_delta = (self.interval_upper_target - self.upper_actions) / resample_interval_steps
+        self.upper_actions += self.step_upper_target_delta
+
     def step(self, actions):
+        # Compute upper body actions
+        self.compute_upper_actions()
         whole_body_actions = torch.zeros(self.num_envs, self.num_dof, device=gs.device, dtype=gs.tc_float)
         whole_body_actions[:, self.env_cfg["lower_dof"]] = actions
+        whole_body_actions[:, self.env_cfg["upper_dof"]] = self.upper_actions
         self.actions = whole_body_actions
 
         clipped_actions = torch.clip(whole_body_actions, -self.env_cfg["clip_actions"], self.env_cfg["clip_actions"])
@@ -280,6 +321,10 @@ class G1Env:
 
         # reset observation history buffer
         self.obs_history_buf[envs_idx] = 0.0
+
+        # reset upper body action buffers
+        self.upper_actions[envs_idx] = 0.0
+        self.step_upper_target_delta[envs_idx] = 0.0
 
         # fill extras
         self.extras["episode"] = {}

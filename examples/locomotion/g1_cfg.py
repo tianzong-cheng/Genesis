@@ -162,6 +162,7 @@ def g1_env_cfgs():
         "lin_vel_y_range": [-0.5, 0.5],
         "ang_vel_range": [-1.0, 1.0],
         "height_range": [0.24, 0.74],
+        "height_task_prob": 0.3,
     }
 
     return env_cfg, obs_cfg, reward_cfg, command_cfg

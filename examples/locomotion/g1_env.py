@@ -131,10 +131,29 @@ class G1Env:
         self.history_idx = 0  # Current position in circular buffer
 
     def _resample_commands(self, envs_idx):
-        self.commands[envs_idx, 0] = gs_rand_float(*self.command_cfg["lin_vel_x_range"], (len(envs_idx),), gs.device)
-        self.commands[envs_idx, 1] = gs_rand_float(*self.command_cfg["lin_vel_y_range"], (len(envs_idx),), gs.device)
-        self.commands[envs_idx, 2] = gs_rand_float(*self.command_cfg["ang_vel_range"], (len(envs_idx),), gs.device)
-        self.commands[envs_idx, 3] = gs_rand_float(*self.command_cfg["height_range"], (len(envs_idx),), gs.device)
+        # task selection
+        height_task_prob = self.command_cfg.get("height_task_prob", 0.0)
+        task_selector = gs_rand_float(0.0, 1.0, (len(envs_idx),), gs.device)
+        height_task_idx = (task_selector < height_task_prob).nonzero(as_tuple=False).reshape(-1)
+        velocity_task_idx = (task_selector >= height_task_prob).nonzero(as_tuple=False).reshape(-1)
+
+        # velocity task
+        self.commands[velocity_task_idx, 0] = gs_rand_float(
+            *self.command_cfg["lin_vel_x_range"], (len(velocity_task_idx),), gs.device
+        )
+        self.commands[velocity_task_idx, 1] = gs_rand_float(
+            *self.command_cfg["lin_vel_y_range"], (len(velocity_task_idx),), gs.device
+        )
+        self.commands[velocity_task_idx, 2] = gs_rand_float(
+            *self.command_cfg["ang_vel_range"], (len(velocity_task_idx),), gs.device
+        )
+        self.commands[velocity_task_idx, 3] = self.command_cfg["height_range"][1]  # 0.74m
+
+        # height task
+        self.commands[height_task_idx, :3] = 0.0
+        self.commands[height_task_idx, 3] = gs_rand_float(
+            *self.command_cfg["height_range"], (len(height_task_idx),), gs.device
+        )
 
     def step(self, actions):
         whole_body_actions = torch.zeros(self.num_envs, self.num_dof, device=gs.device, dtype=gs.tc_float)
@@ -169,7 +188,8 @@ class G1Env:
             .nonzero(as_tuple=False)
             .reshape((-1,))
         )
-        self._resample_commands(envs_idx)
+        if len(envs_idx) > 0:
+            self._resample_commands(envs_idx)
 
         # check termination and reset
         self.reset_buf = self.episode_length_buf > self.max_episode_length

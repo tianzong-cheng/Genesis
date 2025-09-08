@@ -47,6 +47,7 @@ class G1Env:
                 enable_collision=True,
                 enable_joint_limit=True,
                 max_collision_pairs=50,
+                enable_self_collision=False,
             ),
             show_viewer=show_viewer,
         )
@@ -70,8 +71,6 @@ class G1Env:
         self.scene.build(n_envs=num_envs)
 
         # names to indices
-        for joint in self.robot.joints:
-            print(joint.idx, joint.name)
         self.motors_dof_idx = [self.robot.get_joint(name).dof_start for name in self.env_cfg["joint_names"]]
 
         # PD control parameters

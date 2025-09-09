@@ -33,10 +33,10 @@ class G1Env:
 
         # create scene
         self.scene = gs.Scene(
-            sim_options=gs.options.SimOptions(dt=self.dt, substeps=2),
+            sim_options=gs.options.SimOptions(dt=self.dt, substeps=4),
             viewer_options=gs.options.ViewerOptions(
                 max_FPS=int(0.5 / self.dt),
-                camera_pos=(2.0, 0.0, 2.5),
+                camera_pos=(3.0, 3.0, 1.0),
                 camera_lookat=(0.0, 0.0, 0.5),
                 camera_fov=40,
             ),
@@ -66,6 +66,16 @@ class G1Env:
                 quat=self.base_init_quat.cpu().numpy(),
             ),
         )
+
+        # add camera
+        if self.env_cfg.get("record", False):
+            self.record_camera = self.scene.add_camera(
+                res=(640, 480),
+                pos=(5.0, 5.0, 1.0),
+                lookat=(0, 0, 0.5),
+                fov=50,
+                GUI=True,
+            )
 
         # build
         self.scene.build(n_envs=num_envs)

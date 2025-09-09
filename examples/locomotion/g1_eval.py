@@ -11,6 +11,7 @@ def main():
     gs.init()
 
     env_cfg, obs_cfg, reward_cfg, command_cfg = g1_env_cfgs()
+    env_cfg["record"] = True
     env = G1Env(
         num_envs=1,
         env_cfg=env_cfg,
@@ -30,9 +31,17 @@ def main():
 
     obs, _ = env.reset()
     with torch.no_grad():
+        env.record_camera.start_recording()
+        record_step_count = 0
+
         while True:
             actions = policy(obs)
             obs, _, _, _ = env.step(actions)
+
+            record_step_count += 1
+            env.record_camera.render()
+            if record_step_count == 1000:
+                env.record_camera.stop_recording(save_to_filename="video.mp4", fps=25)
 
 
 if __name__ == "__main__":
